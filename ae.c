@@ -5,6 +5,8 @@
 #include <termios.h>
 #include <unistd.h>
 
+#define CTRL_KEY(k) ((k) & 0x1f)
+
 struct termios orig_termios;
 
 /** terminal **/
@@ -17,13 +19,13 @@ void fail(const char *s)
 
 void disable_raw_mode()
 {
-  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
     fail("tcsetattr");
 }
 
 void enable_raw_mode()
 {
-  if(tcgetattr(STDIN_FILENO, &orig_termios) == -1)
+  if (tcgetattr(STDIN_FILENO, &orig_termios) == -1)
     fail("tcgetattr");
   atexit(disable_raw_mode);
 
@@ -36,7 +38,7 @@ void enable_raw_mode()
   raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
   raw.c_cc[VMIN] = 0;
   raw.c_cc[VTIME] = 1;
-  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
     fail("tcsetattr");
 }
 
@@ -50,7 +52,7 @@ int main()
   while (1) {
     char c = '\0';
 
-    if(read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN)
+    if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN)
       fail("read");
 
     if (iscntrl(c)) {
@@ -62,7 +64,7 @@ int main()
     } else {
       printf("%d ('%c')\r\n", c, c);
     }
-    if (c == 'q') break;
+    if (c == CTRL_KEY('q')) break;
   }
 
   return 0;
