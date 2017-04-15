@@ -9,111 +9,111 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 struct Ae {
-  struct screen {
-    int rows;
-    int cols;
-  } screen;
-  struct termios orig_termios;
+	struct screen {
+		int rows;
+		int cols;
+	} screen;
+	struct termios orig_termios;
 } Ae;
 
 /** helpers **/
 
 void print_char(char c)
 {
-  while (read(STDIN_FILENO, &c, 1) == 1) {
-    if (iscntrl(c)) {
-      printf("%d\r\n", c);
-    } else {
-      printf("%d ('%c')\r\n", c, c);
-    }
-  }
+	while (read(STDIN_FILENO, &c, 1) == 1) {
+		if (iscntrl(c)) {
+			printf("%d\r\n", c);
+		} else {
+			printf("%d ('%c')\r\n", c, c);
+		}
+	}
 }
 
 /** terminal **/
 
 void fail(const char *s)
 {
-  write(STDOUT_FILENO, "\x1b[2J", 4);
-  write(STDOUT_FILENO, "\x1b[H", 3);
+	write(STDOUT_FILENO, "\x1b[2J", 4);
+	write(STDOUT_FILENO, "\x1b[H", 3);
 
-  perror(s);
-  exit(1);
+	perror(s);
+	exit(1);
 }
 
 void disable_raw_mode()
 {
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &Ae.orig_termios) == -1)
-    fail("tcsetattr");
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &Ae.orig_termios) == -1)
+		fail("tcsetattr");
 }
 
 void enable_raw_mode()
 {
-  if (tcgetattr(STDIN_FILENO, &Ae.orig_termios) == -1)
-    fail("tcgetattr");
-  atexit(disable_raw_mode);
+	if (tcgetattr(STDIN_FILENO, &Ae.orig_termios) == -1)
+		fail("tcgetattr");
+	atexit(disable_raw_mode);
 
-  struct termios raw = Ae.orig_termios;
-  tcgetattr(STDIN_FILENO, &raw);
+	struct termios raw = Ae.orig_termios;
+	tcgetattr(STDIN_FILENO, &raw);
 
-  raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-  raw.c_oflag &= ~(OPOST);
-  raw.c_cflag |= ~(CS8);
-  raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-  raw.c_cc[VMIN] = 0;
-  raw.c_cc[VTIME] = 1;
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
-    fail("tcsetattr");
+	raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+	raw.c_oflag &= ~(OPOST);
+	raw.c_cflag |= ~(CS8);
+	raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+	raw.c_cc[VMIN] = 0;
+	raw.c_cc[VTIME] = 1;
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
+		fail("tcsetattr");
 }
 
 char editor_read_key()
 {
-  int nread;
-  char c;
-  while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-    if (nread == -1 && errno != EAGAIN)
-      fail("read");
-  }
-  return c;
+	int nread;
+	char c;
+	while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+		if (nread == -1 && errno != EAGAIN)
+			fail("read");
+	}
+	return c;
 }
 
 int cursor_get_position(int *rows, int *cols)
 {
-  char buf[32];
-  unsigned int i = 0;
+	char buf[32];
+	unsigned int i = 0;
 
-  if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4)
-    return -1;
+	if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4)
+		return -1;
 
-  while (1 < sizeof(buf) - 1) {
-    if (read(STDIN_FILENO, &buf[i], 1) != 1)
-      break;
-    if (buf[i] == 'R')
-      break;
-    i++;
-  }
-  buf[i] = '\0';
+	while (1 < sizeof(buf) - 1) {
+		if (read(STDIN_FILENO, &buf[i], 1) != 1)
+			break;
+		if (buf[i] == 'R')
+			break;
+		i++;
+	}
+	buf[i] = '\0';
 
-  if (buf[0] != '\x1b' || buf[1] != '[')
-    return -1;
-  if (sscanf(&buf[2], "%d;%d", rows, cols) != 2)
-    return -1;
+	if (buf[0] != '\x1b' || buf[1] != '[')
+		return -1;
+	if (sscanf(&buf[2], "%d;%d", rows, cols) != 2)
+		return -1;
 
-  return 0;
+	return 0;
 }
 
 int window_get_size(int *rows, int *cols)
 {
-  struct winsize ws;
+	struct winsize ws;
 
-  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-    if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12)
-      return -1;
-    return cursor_get_position(rows, cols);
-  } else {
-    *cols = ws.ws_col;
-    *rows = ws.ws_row;
-    return 0;
-  }
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+		if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12)
+			return -1;
+		return cursor_get_position(rows, cols);
+	} else {
+		*cols = ws.ws_col;
+		*rows = ws.ws_row;
+		return 0;
+	}
 }
 
 
@@ -121,44 +121,44 @@ int window_get_size(int *rows, int *cols)
 
 void editor_init()
 {
-  if (window_get_size(&Ae.screen.rows, &Ae.screen.cols) == -1)
-    fail("window_get_size");
+	if (window_get_size(&Ae.screen.rows, &Ae.screen.cols) == -1)
+		fail("window_get_size");
 }
 
 void editor_draw_rows()
 {
-  int y;
-  for (y = 0; y < Ae.screen.rows; y++) {
-    write(STDOUT_FILENO, "~", 1);
+	int y;
+	for (y = 0; y < Ae.screen.rows; y++) {
+		write(STDOUT_FILENO, "~", 1);
 
-    if (y < Ae.screen.rows - 1)
-      write(STDOUT_FILENO, "\r\n", 2);
-  }
+		if (y < Ae.screen.rows - 1)
+			write(STDOUT_FILENO, "\r\n", 2);
+	}
 }
 
 void editor_refresh_screen()
 {
-  write(STDOUT_FILENO, "\x1b[2J", 4);
-  write(STDOUT_FILENO, "\x1b[H", 3);
+	write(STDOUT_FILENO, "\x1b[2J", 4);
+	write(STDOUT_FILENO, "\x1b[H", 3);
 
-  editor_draw_rows();
+	editor_draw_rows();
 
-  write(STDOUT_FILENO, "\x1b[H", 3);
+	write(STDOUT_FILENO, "\x1b[H", 3);
 }
 
 void editor_process_keypress()
 {
-  char c = editor_read_key();
+	char c = editor_read_key();
 
-  switch (c) {
-    case CTRL_KEY('q'):
-      write(STDOUT_FILENO, "\x1b[2J", 4);
-      write(STDOUT_FILENO, "\x1b[H", 3);
-      exit(0);
-      break;
-    case 3:
-      printf("CTRL-Q to quit\r\n");
-  }
+	switch (c) {
+		case CTRL_KEY('q'):
+			write(STDOUT_FILENO, "\x1b[2J", 4);
+			write(STDOUT_FILENO, "\x1b[H", 3);
+			exit(0);
+			break;
+		case 3:
+			printf("CTRL-Q to quit\r\n");
+	}
 }
 
 
@@ -166,13 +166,13 @@ void editor_process_keypress()
 
 int main()
 {
-  enable_raw_mode();
-  editor_init();
+	enable_raw_mode();
+	editor_init();
 
-  while (1) {
-    editor_refresh_screen();
-    editor_process_keypress();
-  }
+	while (1) {
+		editor_refresh_screen();
+		editor_process_keypress();
+	}
 
-  return 0;
+	return 0;
 }
