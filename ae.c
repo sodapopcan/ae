@@ -16,6 +16,19 @@ struct Ae {
   struct termios orig_termios;
 } Ae;
 
+/** helpers **/
+
+void print_char(char c)
+{
+  while (read(STDIN_FILENO, &c, 1) == 1) {
+    if (iscntrl(c)) {
+      printf("%d\r\n", c);
+    } else {
+      printf("%d ('%c')\r\n", c, c);
+    }
+  }
+}
+
 /** terminal **/
 
 void fail(const char *s)
@@ -52,12 +65,50 @@ void enable_raw_mode()
     fail("tcsetattr");
 }
 
+char editor_read_key()
+{
+  int nread;
+  char c;
+  while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+    if (nread == -1 && errno != EAGAIN)
+      fail("read");
+  }
+  return c;
+}
+
+int cursor_get_position(int *rows, int *cols)
+{
+  char buf[32];
+  unsigned int i = 0;
+
+  if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4)
+    return -1;
+
+  while (1 < sizeof(buf) - 1) {
+    if (read(STDIN_FILENO, &buf[i], 1) != 1)
+      break;
+    if (buf[i] == 'R')
+      break;
+    i++;
+  }
+  buf[i] = '\0';
+
+  if (buf[0] != '\x1b' || buf[1] != '[')
+    return -1;
+  if (sscanf(&buf[2], "%d;%d", rows, cols) != 2)
+    return -1;
+
+  return 0;
+}
+
 int get_window_size(int *rows, int *cols)
 {
   struct winsize ws;
 
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-    return -1;
+    if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12)
+      return -1;
+    return cursor_get_position(rows, cols);
   } else {
     *cols = ws.ws_col;
     *rows = ws.ws_row;
@@ -74,22 +125,14 @@ void editor_init()
     fail("get_window_size");
 }
 
-char editor_read_key()
-{
-  int nread;
-  char c;
-  while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-    if (nread == -1 && errno != EAGAIN)
-      fail("read");
-  }
-  return c;
-}
-
 void editor_draw_rows()
 {
   int y;
   for (y = 0; y < Ae.screen.rows; y++) {
-    write(STDOUT_FILENO, "~\r\n", 3);
+    write(STDOUT_FILENO, "~", 1);
+
+    if (y < Ae.screen.rows - 1)
+      write(STDOUT_FILENO, "\r\n", 2);
   }
 }
 
