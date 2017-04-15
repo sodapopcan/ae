@@ -101,7 +101,7 @@ int cursor_get_position(int *rows, int *cols)
   return 0;
 }
 
-int get_window_size(int *rows, int *cols)
+int window_get_size(int *rows, int *cols)
 {
   struct winsize ws;
 
@@ -121,8 +121,8 @@ int get_window_size(int *rows, int *cols)
 
 void editor_init()
 {
-  if (get_window_size(&Ae.screen.rows, &Ae.screen.cols) == -1)
-    fail("get_window_size");
+  if (window_get_size(&Ae.screen.rows, &Ae.screen.cols) == -1)
+    fail("window_get_size");
 }
 
 void editor_draw_rows()
