@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
@@ -15,6 +16,7 @@ struct Ae {
 	} screen;
 	struct termios orig_termios;
 } Ae;
+
 
 /** helpers **/
 
@@ -117,6 +119,31 @@ int window_get_size(int *rows, int *cols)
 }
 
 
+/** buffer **/
+
+#define BUFFER_INIT {NULL, 0}
+
+typedef struct Buffer {
+	char *b;
+	int len;
+} Buffer;
+
+void buffer_append(Buffer *b, const char *s, int len)
+{
+	char *new = realloc(b->b, b->len + len);
+
+	if (new == NULL)
+		return;
+	memcpy(&new[b->len], s, len);
+	b->b = new;
+	b->len += len;
+}
+
+void buffer_free(Buffer *b)
+{
+	free(b->b);
+}
+
 /** editor **/
 
 void editor_init()
@@ -125,25 +152,31 @@ void editor_init()
 		fail("window_get_size");
 }
 
-void editor_draw_rows()
+void editor_draw_rows(Buffer *b)
 {
 	int y;
 	for (y = 0; y < Ae.screen.rows; y++) {
-		write(STDOUT_FILENO, "~", 1);
+		buffer_append(b, "~", 1);
 
 		if (y < Ae.screen.rows - 1)
-			write(STDOUT_FILENO, "\r\n", 2);
+			buffer_append(b, "\r\n", 2);
 	}
 }
 
 void editor_refresh_screen()
 {
-	write(STDOUT_FILENO, "\x1b[2J", 4);
-	write(STDOUT_FILENO, "\x1b[H", 3);
+	Buffer b = BUFFER_INIT;
 
-	editor_draw_rows();
+	buffer_append(&b, "\x1b[2J", 4);
+	buffer_append(&b, "\x1b[H", 3);
 
-	write(STDOUT_FILENO, "\x1b[H", 3);
+	editor_draw_rows(&b);
+
+	buffer_append(&b, "\x1b[H", 3);
+
+	write(STDOUT_FILENO, b.b, b.len);
+
+	buffer_free(&b);
 }
 
 void editor_process_keypress()
