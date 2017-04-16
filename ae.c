@@ -23,11 +23,10 @@ struct Ae {
 void print_char(char c)
 {
 	while (read(STDIN_FILENO, &c, 1) == 1) {
-		if (iscntrl(c)) {
+		if (iscntrl(c))
 			printf("%d\r\n", c);
-		} else {
+		else
 			printf("%d ('%c')\r\n", c, c);
-		}
 	}
 }
 
