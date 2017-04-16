@@ -212,6 +212,24 @@ void editor_refresh_screen()
 	buffer_free(&b);
 }
 
+void editor_move_cursor(char key)
+{
+	switch(key) {
+		case 'h':
+			Ae.cursor_x--;
+			break;
+		case 'l':
+			Ae.cursor_x++;
+			break;
+		case 'k':
+			Ae.cursor_y--;
+			break;
+		case 'j':
+			Ae.cursor_y++;
+			break;
+	}
+}
+
 void editor_process_keypress()
 {
 	char c = editor_read_key();
@@ -224,6 +242,13 @@ void editor_process_keypress()
 			break;
 		case 3:
 			printf("CTRL-Q to quit\r\n");
+			break;
+		case 'h':
+		case 'j':
+		case 'k':
+		case 'l':
+			editor_move_cursor(c);
+			break;
 	}
 }
 
