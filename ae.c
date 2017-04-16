@@ -9,6 +9,7 @@
 
 #define AE_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
+#define EMPTY_LINE_CHAR "~"
 
 struct Ae {
 	struct screen {
@@ -152,27 +153,32 @@ void editor_init()
 		fail("window_get_size");
 }
 
+void editor_welcome_msg(Buffer *b)
+{
+	char welcome[80];
+	int welcome_len = snprintf(welcome, sizeof welcome,
+			"Andrew's Editor -- version %s", AE_VERSION);
+	if (welcome_len > Ae.screen.cols)
+		welcome_len = Ae.screen.cols;
+	int padding = (Ae.screen.cols - welcome_len) / 2;
+	if (padding) {
+		buffer_append(b, EMPTY_LINE_CHAR, 1);
+		padding--;
+	}
+	while (padding--)
+		buffer_append(b, " ", 1);
+	buffer_append(b, welcome, welcome_len);
+}
+
 void editor_draw_rows(Buffer *b)
 {
 	int y;
 	for (y = 0; y < Ae.screen.rows; y++) {
 		if (y == Ae.screen.rows / 3) {
-			char welcome[80];
-			int welcome_len = snprintf(welcome, sizeof welcome,
-			    "Andrew's Editor -- version %s", AE_VERSION);
-			if (welcome_len > Ae.screen.cols)
-				welcome_len = Ae.screen.cols;
-			int padding = (Ae.screen.cols - welcome_len) / 2;
-			if (padding) {
-				buffer_append(b, "~", 1);
-				padding--;
-			}
-			while (padding--)
-				buffer_append(b, " ", 1);
-			buffer_append(b, welcome, welcome_len);
+			editor_welcome_msg(b);
 
 		} else {
-			buffer_append(b, "~", 1);
+			buffer_append(b, EMPTY_LINE_CHAR, 1);
 		}
 
 		if (y < Ae.screen.rows - 1)
