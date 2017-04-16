@@ -11,6 +11,13 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define EMPTY_LINE_CHAR "~"
 
+enum editor_key {
+	ARROW_LEFT = 1000,
+	ARROW_RIGHT,
+	ARROW_UP,
+	ARROW_DOWN
+};
+
 struct Ae {
 	int cursor_x;
 	int cursor_y;
@@ -70,7 +77,7 @@ void enable_raw_mode()
 		fail("tcsetattr");
 }
 
-char editor_read_key()
+int editor_read_key()
 {
 	int nread;
 	char c;
@@ -78,7 +85,28 @@ char editor_read_key()
 		if (nread == -1 && errno != EAGAIN)
 			fail("read");
 	}
-	return c;
+
+	if (c == '\x1b') {
+		char seq[3];
+
+		if (read(STDIN_FILENO, &seq[0], 1) != 1)
+			return '\x1b';
+		if (read(STDIN_FILENO, &seq[1], 1) != 1)
+			return '\x1b';
+
+		if (seq[0] == '[') {
+			switch(seq[1]) {
+				case 'A': return ARROW_UP;
+				case 'B': return ARROW_DOWN;
+				case 'C': return ARROW_RIGHT;
+				case 'D': return ARROW_LEFT;
+			}
+		}
+
+		return '\x1b';
+	} else {
+		return c;
+	}
 }
 
 int cursor_get_position(int *rows, int *cols)
@@ -212,19 +240,19 @@ void editor_refresh_screen()
 	buffer_free(&b);
 }
 
-void editor_move_cursor(char key)
+void editor_move_cursor(int key)
 {
 	switch(key) {
-		case 'h':
+		case ARROW_LEFT:
 			Ae.cursor_x--;
 			break;
-		case 'l':
+		case ARROW_RIGHT:
 			Ae.cursor_x++;
 			break;
-		case 'k':
+		case ARROW_UP:
 			Ae.cursor_y--;
 			break;
-		case 'j':
+		case ARROW_DOWN:
 			Ae.cursor_y++;
 			break;
 	}
@@ -232,7 +260,7 @@ void editor_move_cursor(char key)
 
 void editor_process_keypress()
 {
-	char c = editor_read_key();
+	int c = editor_read_key();
 
 	switch (c) {
 		case CTRL_KEY('q'):
@@ -243,10 +271,10 @@ void editor_process_keypress()
 		case 3:
 			printf("CTRL-Q to quit\r\n");
 			break;
-		case 'h':
-		case 'j':
-		case 'k':
-		case 'l':
+		case ARROW_LEFT:
+		case ARROW_RIGHT:
+		case ARROW_UP:
+		case ARROW_DOWN:
 			editor_move_cursor(c);
 			break;
 	}
