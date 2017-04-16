@@ -7,6 +7,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#define AE_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 struct Ae {
@@ -155,7 +156,24 @@ void editor_draw_rows(Buffer *b)
 {
 	int y;
 	for (y = 0; y < Ae.screen.rows; y++) {
-		buffer_append(b, "~", 1);
+		if (y == Ae.screen.rows / 3) {
+			char welcome[80];
+			int welcome_len = snprintf(welcome, sizeof welcome,
+			    "Andrew's Editor -- version %s", AE_VERSION);
+			if (welcome_len > Ae.screen.cols)
+				welcome_len = Ae.screen.cols;
+			int padding = (Ae.screen.cols - welcome_len) / 2;
+			if (padding) {
+				buffer_append(b, "~", 1);
+				padding--;
+			}
+			while (padding--)
+				buffer_append(b, " ", 1);
+			buffer_append(b, welcome, welcome_len);
+
+		} else {
+			buffer_append(b, "~", 1);
+		}
 
 		if (y < Ae.screen.rows - 1)
 			buffer_append(b, "\r\n", 2);
