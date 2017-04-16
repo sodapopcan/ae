@@ -12,6 +12,8 @@
 #define EMPTY_LINE_CHAR "~"
 
 struct Ae {
+	int cursor_x;
+	int cursor_y;
 	struct screen {
 		int rows;
 		int cols;
@@ -149,6 +151,9 @@ void buffer_free(Buffer *b)
 
 void editor_init()
 {
+	Ae.cursor_x = 0;
+	Ae.cursor_y = 0;
+
 	if (window_get_size(&Ae.screen.rows, &Ae.screen.cols) == -1)
 		fail("window_get_size");
 }
@@ -196,7 +201,10 @@ void editor_refresh_screen()
 
 	editor_draw_rows(&b);
 
-	buffer_append(&b, "\x1b[H", 3);
+	char tbuf[32];
+	snprintf(tbuf, sizeof tbuf, "\x1b[%d;%dH", Ae.cursor_y + 1, Ae.cursor_x + 1);
+	buffer_append(&b, tbuf, strlen(tbuf));
+
 	buffer_append(&b, "\x1b[?25h", 6);
 
 	write(STDOUT_FILENO, b.b, b.len);
