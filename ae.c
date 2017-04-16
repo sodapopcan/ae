@@ -166,12 +166,14 @@ void editor_refresh_screen()
 {
 	Buffer b = BUFFER_INIT;
 
+	buffer_append(&b, "\x1b[?25l", 6);
 	buffer_append(&b, "\x1b[2J", 4);
 	buffer_append(&b, "\x1b[H", 3);
 
 	editor_draw_rows(&b);
 
 	buffer_append(&b, "\x1b[H", 3);
+	buffer_append(&b, "\x1b[?25h", 6);
 
 	write(STDOUT_FILENO, b.b, b.len);
 
