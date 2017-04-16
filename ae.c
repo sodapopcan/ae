@@ -242,18 +242,22 @@ void editor_refresh_screen()
 
 void editor_move_cursor(int key)
 {
-	switch(key) {
+	switch (key) {
 		case ARROW_LEFT:
-			Ae.cursor_x--;
+			if (Ae.cursor_x != 0)
+				Ae.cursor_x--;
 			break;
 		case ARROW_RIGHT:
-			Ae.cursor_x++;
+			if (Ae.cursor_x != Ae.screen.cols - 1)
+				Ae.cursor_x++;
 			break;
 		case ARROW_UP:
-			Ae.cursor_y--;
+			if (Ae.cursor_y != 0)
+				Ae.cursor_y--;
 			break;
 		case ARROW_DOWN:
-			Ae.cursor_y++;
+			if (Ae.cursor_y != Ae.screen.rows - 1)
+				Ae.cursor_y++;
 			break;
 	}
 }
