@@ -1,9 +1,14 @@
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -18,6 +23,11 @@ enum editor_key {
 	ARROW_DOWN
 };
 
+typedef struct erow {
+	int size;
+	char *chars;
+} erow;
+
 struct Ae {
 	int cursor_x;
 	int cursor_y;
@@ -25,6 +35,8 @@ struct Ae {
 		int rows;
 		int cols;
 	} screen;
+	int num_rows;
+	erow row;
 	struct termios orig_termios;
 } Ae;
 
@@ -150,6 +162,34 @@ int window_get_size(int *rows, int *cols)
 }
 
 
+/** file i/o **/
+
+void editor_open(char *filename)
+{
+	FILE *fp = fopen(filename, "r");
+	if (!fp)
+		fail("fopen");
+
+	char *line = NULL;
+	size_t line_cap = 0;
+	ssize_t line_len;
+	line_len = getline(&line, &line_cap, fp);
+	if (line_len != -1) {
+		while (line_len > 0 && (line[line_len - 1] == '\n' ||
+					line[line_len - 1] == '\r'))
+			line_len--;
+
+		Ae.row.size = line_len;
+		Ae.row.chars = malloc(line_len + 1);
+		memcpy(Ae.row.chars, line, line_len);
+		Ae.row.chars[line_len] = '\0';
+		Ae.num_rows = 1;
+	}
+	free(line);
+	fclose(fp);
+}
+
+
 /** buffer **/
 
 #define BUFFER_INIT {NULL, 0}
@@ -181,6 +221,7 @@ void editor_init()
 {
 	Ae.cursor_x = 0;
 	Ae.cursor_y = 0;
+	Ae.num_rows = 0;
 
 	if (window_get_size(&Ae.screen.rows, &Ae.screen.cols) == -1)
 		fail("window_get_size");
@@ -207,15 +248,24 @@ void editor_draw_rows(Buffer *b)
 {
 	int y;
 	for (y = 0; y < Ae.screen.rows; y++) {
-		if (y == Ae.screen.rows / 3) {
-			editor_welcome_msg(b);
+		if (y >= Ae.num_rows) {
+			if (Ae.num_rows == 0 && y == Ae.screen.rows / 3) {
+				editor_welcome_msg(b);
 
+			} else {
+				buffer_append(b, EMPTY_LINE_CHAR, 1);
+			}
 		} else {
-			buffer_append(b, EMPTY_LINE_CHAR, 1);
+			int len = Ae.row.size;
+			if (len > Ae.screen.cols)
+				len = Ae.screen.cols;
+			buffer_append(b, Ae.row.chars, len);
 		}
 
-		if (y < Ae.screen.rows - 1)
+		buffer_append(b, "\x1b[K", 3);
+		if (y < Ae.screen.rows - 1) {
 			buffer_append(b, "\r\n", 2);
+		}
 	}
 }
 
@@ -287,10 +337,14 @@ void editor_process_keypress()
 
 /** init **/
 
-int main()
+int main(int argc, char *argv[])
 {
 	enable_raw_mode();
 	editor_init();
+	if (argc >= 2) {
+		editor_open(argv[1]);
+
+	}
 
 	while (1) {
 		editor_refresh_screen();
