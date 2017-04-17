@@ -36,7 +36,7 @@ struct Ae {
 		int cols;
 	} screen;
 	int num_rows;
-	erow row;
+	erow *row;
 	struct termios orig_termios;
 } Ae;
 
@@ -164,6 +164,17 @@ int window_get_size(int *rows, int *cols)
 
 /** file i/o **/
 
+void editor_append_row(char *s, size_t len)
+{
+	Ae.row = realloc(Ae.row, sizeof(erow) * (Ae.num_rows + 1));
+	int r = Ae.num_rows;
+	Ae.row[r].size = len;
+	Ae.row[r].chars = malloc(len + 1);
+	memcpy(Ae.row[r].chars, s, len);
+	Ae.row[r].chars[len] = '\0';
+	Ae.num_rows++;
+}
+
 void editor_open(char *filename)
 {
 	FILE *fp = fopen(filename, "r");
@@ -173,17 +184,12 @@ void editor_open(char *filename)
 	char *line = NULL;
 	size_t line_cap = 0;
 	ssize_t line_len;
-	line_len = getline(&line, &line_cap, fp);
-	if (line_len != -1) {
+	while(( line_len = getline(&line, &line_cap, fp)) != -1) {
 		while (line_len > 0 && (line[line_len - 1] == '\n' ||
 					line[line_len - 1] == '\r'))
 			line_len--;
 
-		Ae.row.size = line_len;
-		Ae.row.chars = malloc(line_len + 1);
-		memcpy(Ae.row.chars, line, line_len);
-		Ae.row.chars[line_len] = '\0';
-		Ae.num_rows = 1;
+		editor_append_row(line, line_len);
 	}
 	free(line);
 	fclose(fp);
@@ -222,6 +228,7 @@ void editor_init()
 	Ae.cursor_x = 0;
 	Ae.cursor_y = 0;
 	Ae.num_rows = 0;
+	Ae.row = NULL;
 
 	if (window_get_size(&Ae.screen.rows, &Ae.screen.cols) == -1)
 		fail("window_get_size");
@@ -256,10 +263,10 @@ void editor_draw_rows(Buffer *b)
 				buffer_append(b, EMPTY_LINE_CHAR, 1);
 			}
 		} else {
-			int len = Ae.row.size;
+			int len = Ae.row[y].size;
 			if (len > Ae.screen.cols)
 				len = Ae.screen.cols;
-			buffer_append(b, Ae.row.chars, len);
+			buffer_append(b, Ae.row[y].chars, len);
 		}
 
 		buffer_append(b, "\x1b[K", 3);
