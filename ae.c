@@ -31,12 +31,13 @@ typedef struct erow {
 struct Ae {
 	int cursor_x;
 	int cursor_y;
+	int row_offset;
+	int num_rows;
+	erow *row;
 	struct screen {
 		int rows;
 		int cols;
 	} screen;
-	int num_rows;
-	erow *row;
 	struct termios orig_termios;
 } Ae;
 
@@ -227,6 +228,7 @@ void editor_init()
 {
 	Ae.cursor_x = 0;
 	Ae.cursor_y = 0;
+	Ae.row_offset = 0;
 	Ae.num_rows = 0;
 	Ae.row = NULL;
 
@@ -251,11 +253,20 @@ void editor_welcome_msg(Buffer *b)
 	buffer_append(b, welcome, welcome_len);
 }
 
+void editor_scroll()
+{
+	if (Ae.cursor_y < Ae.row_offset)
+		Ae.row_offset = Ae.cursor_y;
+	if (Ae.cursor_y >= Ae.row_offset + Ae.screen.rows)
+		Ae.row_offset = Ae.cursor_y - Ae.screen.rows + 1;
+}
+
 void editor_draw_rows(Buffer *b)
 {
 	int y;
 	for (y = 0; y < Ae.screen.rows; y++) {
-		if (y >= Ae.num_rows) {
+		int file_row = y + Ae.row_offset;
+		if (file_row >= Ae.num_rows) {
 			if (Ae.num_rows == 0 && y == Ae.screen.rows / 3) {
 				editor_welcome_msg(b);
 
@@ -263,10 +274,10 @@ void editor_draw_rows(Buffer *b)
 				buffer_append(b, EMPTY_LINE_CHAR, 1);
 			}
 		} else {
-			int len = Ae.row[y].size;
+			int len = Ae.row[file_row].size;
 			if (len > Ae.screen.cols)
 				len = Ae.screen.cols;
-			buffer_append(b, Ae.row[y].chars, len);
+			buffer_append(b, Ae.row[file_row].chars, len);
 		}
 
 		buffer_append(b, "\x1b[K", 3);
@@ -278,6 +289,8 @@ void editor_draw_rows(Buffer *b)
 
 void editor_refresh_screen()
 {
+	editor_scroll();
+
 	Buffer b = BUFFER_INIT;
 
 	buffer_append(&b, "\x1b[?25l", 6);
@@ -287,7 +300,8 @@ void editor_refresh_screen()
 	editor_draw_rows(&b);
 
 	char tbuf[32];
-	snprintf(tbuf, sizeof tbuf, "\x1b[%d;%dH", Ae.cursor_y + 1, Ae.cursor_x + 1);
+	snprintf(tbuf, sizeof tbuf, "\x1b[%d;%dH", (Ae.cursor_y - Ae.row_offset) + 1,
+			Ae.cursor_x + 1);
 	buffer_append(&b, tbuf, strlen(tbuf));
 
 	buffer_append(&b, "\x1b[?25h", 6);
@@ -313,7 +327,7 @@ void editor_move_cursor(int key)
 				Ae.cursor_y--;
 			break;
 		case ARROW_DOWN:
-			if (Ae.cursor_y != Ae.screen.rows - 1)
+			if (Ae.cursor_y < Ae.num_rows)
 				Ae.cursor_y++;
 			break;
 	}
