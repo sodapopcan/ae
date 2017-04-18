@@ -32,6 +32,7 @@ struct Ae {
 	int cursor_x;
 	int cursor_y;
 	int row_offset;
+	int col_offset;
 	int num_rows;
 	erow *row;
 	struct screen {
@@ -229,6 +230,7 @@ void editor_init()
 	Ae.cursor_x = 0;
 	Ae.cursor_y = 0;
 	Ae.row_offset = 0;
+	Ae.col_offset = 0;
 	Ae.num_rows = 0;
 	Ae.row = NULL;
 
@@ -259,6 +261,10 @@ void editor_scroll()
 		Ae.row_offset = Ae.cursor_y;
 	if (Ae.cursor_y >= Ae.row_offset + Ae.screen.rows)
 		Ae.row_offset = Ae.cursor_y - Ae.screen.rows + 1;
+	if (Ae.cursor_x < Ae.col_offset)
+		Ae.col_offset = Ae.cursor_x;
+	if (Ae.cursor_x >= Ae.col_offset + Ae.screen.cols)
+		Ae.col_offset = Ae.screen.cols + 1;
 }
 
 void editor_draw_rows(Buffer *b)
@@ -274,10 +280,12 @@ void editor_draw_rows(Buffer *b)
 				buffer_append(b, EMPTY_LINE_CHAR, 1);
 			}
 		} else {
-			int len = Ae.row[file_row].size;
+			int len = Ae.row[file_row].size - Ae.col_offset;
+			if (len < 0)
+				len = 0;
 			if (len > Ae.screen.cols)
 				len = Ae.screen.cols;
-			buffer_append(b, Ae.row[file_row].chars, len);
+			buffer_append(b, &Ae.row[file_row].chars[Ae.col_offset], len);
 		}
 
 		buffer_append(b, "\x1b[K", 3);
@@ -300,8 +308,9 @@ void editor_refresh_screen()
 	editor_draw_rows(&b);
 
 	char tbuf[32];
-	snprintf(tbuf, sizeof tbuf, "\x1b[%d;%dH", (Ae.cursor_y - Ae.row_offset) + 1,
-			Ae.cursor_x + 1);
+	snprintf(tbuf, sizeof tbuf, "\x1b[%d;%dH",
+			(Ae.cursor_y - Ae.row_offset) + 1,
+			(Ae.cursor_x - Ae.col_offset) + 1);
 	buffer_append(&b, tbuf, strlen(tbuf));
 
 	buffer_append(&b, "\x1b[?25h", 6);
@@ -319,8 +328,7 @@ void editor_move_cursor(int key)
 				Ae.cursor_x--;
 			break;
 		case ARROW_RIGHT:
-			if (Ae.cursor_x != Ae.screen.cols - 1)
-				Ae.cursor_x++;
+			Ae.cursor_x++;
 			break;
 		case ARROW_UP:
 			if (Ae.cursor_y != 0)
